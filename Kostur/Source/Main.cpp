@@ -23,6 +23,13 @@ glm::vec3 cameraPos = glm::vec3(0.0f, 2.0f, 5.0f); // Početna pozicija
 glm::vec3 cameraFront = glm::vec3(0.0f, -0.5f, -1.0f); // Gleda blago dole
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
+glm::vec3 savedWalkPos = glm::vec3(0.0f, 2.0f, 5.0f);
+glm::vec3 savedWalkFront = glm::vec3(0.0f, -0.5f, -1.0f);
+
+// 2. Podaci za Measurement Mode
+glm::vec3 savedMeasurePos = glm::vec3(0.0f, 10.0f, 14.0f);
+glm::vec3 savedMeasureFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
+
 // Tajming
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -526,12 +533,46 @@ void processInput(GLFWwindow* window)
     if (cameraPos.x < -10.0f) cameraPos.x = -10.0f;
 
     if (cameraPos.z > 15.0f) cameraPos.z = 15.0f;
-    if (cameraPos.z < -10.0f) cameraPos.z = -10.0f;
+    if (cameraPos.z < -5.0f) cameraPos.z = -5.0f;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void toggleMode()
+{
+    if (isWalkingMode)
+    {
+        // TRENUTNO SMO U SETANJU -> PRELAZIMO U MERENJE
+
+        // 1. Sacuvaj trenutnu poziciju setanja
+        savedWalkPos = cameraPos;
+        savedWalkFront = cameraFront;
+
+        // 2. Promeni rezim
+        isWalkingMode = false;
+
+        // 3. Ucitaj poslednju poziciju merenja
+        cameraPos = savedMeasurePos;
+        cameraFront = savedMeasureFront;
+    }
+    else
+    {
+        // TRENUTNO SMO U MERENJU -> PRELAZIMO U SETANJE
+
+        // 1. Sacuvaj trenutnu poziciju merenja
+        savedMeasurePos = cameraPos;
+        savedMeasureFront = cameraFront;
+
+        // 2. Promeni rezim
+        isWalkingMode = true;
+
+        // 3. Ucitaj poslednju poziciju setanja
+        cameraPos = savedWalkPos;
+        cameraFront = savedWalkFront;
+    }
 }
 
 void mouse_callback(GLFWwindow* window, int button, int action, int mods)
@@ -558,18 +599,7 @@ void mouse_callback(GLFWwindow* window, int button, int action, int mods)
         // Proveri da li je mis unutar pravougaonika
         if (xpos >= iconLeft && xpos <= iconRight && ypos >= iconTop && ypos <= iconBottom)
         {
-            // KLIKNUTO NA DUGME!
-            isWalkingMode = !isWalkingMode; // Promeni mod
-
-            // Azuriraj kameru odmah (kopirano iz key_callback)
-            if (isWalkingMode) {
-                cameraPos.y = 2.0f;
-                cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
-            }
-            else {
-                cameraPos.y = 10.0f;
-                cameraFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
-            }
+            toggleMode();
 
             return; // <--- BITNO: Izadji iz funkcije, ne radi raycasting!
         }
@@ -678,18 +708,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     // Akcija GLFW_PRESS znaci da je taster pritisnut (poziva se samo jednom po kliku)
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
     {
-        isWalkingMode = !isWalkingMode; // Obrni vrednost (True <-> False)
-
-        // Podesavanje visine i ugla kamere pri promeni rezima
-        if (isWalkingMode) {
-            cameraPos.y = 2.0f; // Nize za setnju
-            // Gleda blago dole da bi video lika i mapu
-            cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
-        }
-        else {
-            cameraPos.y = 10.0f; // Visoko za merenje
-            // Gleda skoro skroz dole (kao 2D)
-            cameraFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
-        }
+        toggleMode();
     }
 }
