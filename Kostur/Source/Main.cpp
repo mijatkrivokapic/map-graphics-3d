@@ -53,6 +53,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void renderMap(unsigned int vao, Shader& shader, unsigned int texture);
 void mouse_callback(GLFWwindow* window, int button, int action, int mods);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 int main()
 {
@@ -88,6 +89,7 @@ int main()
 
 
     glfwSetMouseButtonCallback(window, mouse_callback);
+    glfwSetKeyCallback(window, key_callback);
 
     if (glewInit() != GLEW_OK) {
         std::cout << "Failed to initialize GLEW" << std::endl;
@@ -171,41 +173,77 @@ int main()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glEnable(GL_DEPTH_TEST);
+        phongShader.use();
+
         // ===========================================
-        // 1. FAZA: 3D SCENA (Mapa, Lik, Čiode)
+        // 1. FAZA: 3D SCENA
         // ===========================================
         glEnable(GL_DEPTH_TEST);
         phongShader.use();
 
-        // --- A) Globalna podešavanja za 3D (Svetlo i Kamera) ---
-        phongShader.setVec3("uLight.pos", lightPos);
-        phongShader.setVec3("uLight.kA", 0.2f, 0.2f, 0.2f);
-        phongShader.setVec3("uLight.kD", 0.8f, 0.8f, 0.8f);
-        phongShader.setVec3("uLight.kS", 1.0f, 1.0f, 1.0f);
+        // A) PODEŠAVANJE SUNCA (Directional Light)
+        // Smer svetla: Gleda na dole i malo u stranu (-0.2, -1.0, -0.3)
+
+
+        phongShader.setVec3("uSun.direction", -0.2f, -1.0f, -0.3f);
+        phongShader.setVec3("uSun.kA", 0.4f, 0.4f, 0.4f); // Jako ambijentalno (da ne bude mrak)
+        phongShader.setVec3("uSun.kD", 0.4f, 0.4f, 0.4f); // Jako suncevo svetlo (Belo)
+        phongShader.setVec3("uSun.kS", 0.25f, 0.25f, 0.25f); // Odsjaj
+
         phongShader.setVec3("uViewPos", cameraPos);
 
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-        // View matrica (ona tvoja zakošena logika)
+        // B) PODEŠAVANJE ČIODA (Point Lights)
+        int nrLights = 0;
+
+        if (!isWalkingMode) {
+            nrLights = std::min((int)measurementPoints.size(), 32);
+        }
+
+        // Saljemo broj svetala shaderu (0 ako setamo, N ako merimo)
+        phongShader.setInt("uNrActiveLights", nrLights);
+
+        for (int i = 0; i < nrLights; i++)
+        {
+            std::string number = std::to_string(i);
+
+            // Pozicija: Iznad ciode
+            phongShader.setVec3("pointLights[" + number + "].position", measurementPoints[i] + glm::vec3(0.0f, 1.5f, 0.0f));
+
+            // Boja Ciode: CRVENA
+            phongShader.setVec3("pointLights[" + number + "].kA", 0.0f, 0.0f, 0.0f);
+            phongShader.setVec3("pointLights[" + number + "].kD", 0.5f, 0.0f, 0.0f); // Jaka crvena!
+            phongShader.setVec3("pointLights[" + number + "].kS", 0.5f, 0.0f, 0.0f);
+
+            // Domet
+            phongShader.setFloat("pointLights[" + number + "].constant", 1.0f);
+            phongShader.setFloat("pointLights[" + number + "].linear", 0.35f);
+            phongShader.setFloat("pointLights[" + number + "].quadratic", 0.44f);
+        }
+
+        // Matrice
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height); // Uvek koristi prave dimenzije
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, glm::vec3(0.0f, 1.0f, 0.0f));
-
         phongShader.setMat4("uP", projection);
         phongShader.setMat4("uV", view);
 
 
-        // --- B) Iscrtavanje MAPE ---
+        // C) ISCRTAVANJE MAPE
         glm::mat4 model = glm::mat4(1.0f);
         phongShader.setMat4("uM", model);
 
-        // Materijal mape
-        phongShader.setVec3("uMaterial.kA", 0.5f, 0.5f, 0.5f);
-        phongShader.setVec3("uMaterial.kD", 0.6f, 0.6f, 0.6f);
-        phongShader.setVec3("uMaterial.kS", 0.1f, 0.1f, 0.1f);
+        // Materijal mape (Mora biti BELI da bi se videla tekstura)
+        phongShader.setVec3("uMaterial.kA", 1.0f, 1.0f, 1.0f);
+        phongShader.setVec3("uMaterial.kD", 1.0f, 1.0f, 1.0f);
+        phongShader.setVec3("uMaterial.kS", 0.2f, 0.2f, 0.2f); // Mali odsjaj
         phongShader.setFloat("uMaterial.shine", 32.0f);
 
-        // Tekstura mape (UKLJUČENA)
+        // Tekstura
         phongShader.setInt("uUseTexture", 1);
-        phongShader.setInt("texture_diffuse1", 0);
+        phongShader.setInt("uTexture", 0); // Slot 0
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, mapTexture);
 
@@ -213,99 +251,61 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
-        // --- C) SPECIFIČNO PO REŽIMIMA ---
-
+        // D) ISCRTAVANJE LIKA / ČIODA
         if (isWalkingMode)
         {
-            // --- Logika setanja ---
-            // Racunamo predjeni put
             float dist = glm::distance(playerPos, lastPlayerPos);
             totalDistance += dist;
             lastPlayerPos = playerPos;
 
-            // --- Iscrtavanje LIKA ---
+            phongShader.setVec3("uMaterial.kA", 1.0f, 1.0f, 1.0f);
+            phongShader.setVec3("uMaterial.kD", 1.0f, 1.0f, 1.0f);
+
             model = glm::mat4(1.0f);
             model = glm::translate(model, playerPos);
             model = glm::rotate(model, glm::radians(playerRotation), glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.01f)); // Pazi na skalu
-
+            model = glm::scale(model, glm::vec3(0.01f));
             phongShader.setMat4("uM", model);
-
-            // Materijal i tekstura lika
-            phongShader.setVec3("uMaterial.kA", 1.0f, 1.0f, 1.0f);
-            phongShader.setVec3("uMaterial.kD", 1.0f, 1.0f, 1.0f);
-            phongShader.setVec3("uMaterial.kS", 0.5f, 0.5f, 0.5f);
-
-            phongShader.setInt("uUseTexture", 1); // Lik koristi teksturu
             humanoidModel.Draw(phongShader);
-
         }
         else
         {
-            // --- Logika merenja ---
-            // U ovom rezimu ne crtamo lika, vec ciode i linije
+            // --- Cioda (Pin) ---
+            phongShader.setInt("uUseTexture", 0); // Iskljucujemo teksturu, hocemo cistu boju
 
-            // 1. Iscrtavanje ČIODA
-            phongShader.setInt("uUseTexture", 0); // Iskljuci teksturu (bojimo rucno)
-
-            // Crvena boja
+            // Cioda SAMA PO SEBI treba da bude CRVENA (Glowing Effect)
+            // Zato joj dajemo jako Ambijentalno svetlo u materijalu
+            phongShader.setVec3("uMaterial.kA", 1.0f, 0.0f, 0.0f); // Crvena boja
             phongShader.setVec3("uMaterial.kD", 1.0f, 0.0f, 0.0f);
             phongShader.setVec3("uMaterial.kS", 1.0f, 1.0f, 1.0f);
-            phongShader.setFloat("uMaterial.shine", 64.0f);
 
             for (unsigned int i = 0; i < measurementPoints.size(); i++)
             {
-                glm::mat4 model = glm::mat4(1.0f);
-
-                // 1. Postavi na tacnu lokaciju klika
+                model = glm::mat4(1.0f);
                 model = glm::translate(model, measurementPoints[i]);
-
-                // --- NOVO: PODIZANJE MODELA ---
-                // Dodajemo ofset po Y osi da bi "igla" bola mapu, a lopta bila gore.
-                // Vrednost 1.0f ili 2.0f zavisi od toga koliko je model originalno velik.
-                // Probaj redom: 0.5f, 1.0f, 2.0f dok ne izgleda dobro.
                 model = glm::translate(model, glm::vec3(0.0f, 0.75f, 0.0f));
-
-                // 2. Skaliranje
                 model = glm::scale(model, glm::vec3(0.2f));
-
                 phongShader.setMat4("uM", model);
                 pinModel.Draw(phongShader);
             }
 
-            // 2. Iscrtavanje LINIJA
-            if (measurementPoints.size() > 1)
-            {
-                // Boja: Koristimo Ambijentalnu komponentu da linija bude skroz CRVENA
-                // Posto linije nemaju normale, difuzno i spekularno mora biti 0
-                phongShader.setVec3("uMaterial.kA", 1.0f, 0.0f, 0.0f); // Crvena boja
-                phongShader.setVec3("uMaterial.kD", 0.0f, 0.0f, 0.0f); // Iskljuci difuzno
-                phongShader.setVec3("uMaterial.kS", 0.0f, 0.0f, 0.0f); // Iskljuci odsjaj
+            // --- Linije ---
+            if (measurementPoints.size() > 1) {
+                phongShader.setVec3("uMaterial.kA", 1.0f, 0.0f, 0.0f); // Crvene linije
+                phongShader.setVec3("uMaterial.kD", 0.0f, 0.0f, 0.0f);
 
-                glm::mat4 model = glm::mat4(1.0f);
-
-                // KLJUČNO: Podižemo linije malo iznad poda (0.05 po Y osi)
-                // Ovo rešava problem "isprekidanih" linija (Z-fighting)
+                model = glm::mat4(1.0f);
                 model = glm::translate(model, glm::vec3(0.0f, 0.05f, 0.0f));
-
                 phongShader.setMat4("uM", model);
 
-                // Ažuriramo podatke
                 glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
                 glBufferData(GL_ARRAY_BUFFER, measurementPoints.size() * sizeof(glm::vec3), &measurementPoints[0], GL_DYNAMIC_DRAW);
-
                 glBindVertexArray(lineVAO);
-
-                // Povećavamo debljinu linije
-                glLineWidth(5.0f); // Probaj vrednost 3.0f ili 5.0f
-
+                glLineWidth(5.0f);
                 glDrawArrays(GL_LINE_STRIP, 0, measurementPoints.size());
-
-                // Vraćamo debljinu na normalu da ne utiče na ostale objekte (ako crtamo wireframe)
                 glLineWidth(1.0f);
             }
         }
-
 
         // ===========================================
         // 2. FAZA: 2D UI (Tekst i ikone)
@@ -357,27 +357,7 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Promena režima (Space)
-    static bool spacePressed = false;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !spacePressed) {
-        isWalkingMode = !isWalkingMode;
-        spacePressed = true;
-
-        // Podesavanje visine i ugla kamere pri promeni rezima
-        if (isWalkingMode) {
-            cameraPos.y = 2.0f; // Nize za setnju
-            // Gleda blago dole da bi video lika i mapu
-            cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
-        }
-        else {
-            cameraPos.y = 10.0f; // Visoko za merenje
-            // Gleda skoro skroz dole (kao 2D)
-            cameraFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
-        }
-    }
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
-        spacePressed = false;
-    }
+    // --- PROMENA REŽIMA JE SADA U key_callback ---
 
     // Brzine
     float velocity = playerSpeed * deltaTime;
@@ -385,7 +365,7 @@ void processInput(GLFWwindow* window)
 
     if (isWalkingMode)
     {
-        // 1. KRETANJE LIKA (WASD) - Samo menja playerPos
+        // 1. KRETANJE LIKA (WASD)
         glm::vec3 oldPos = playerPos;
 
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
@@ -409,7 +389,7 @@ void processInput(GLFWwindow* window)
         if (playerPos.x < -10.0f || playerPos.x > 10.0f || playerPos.z < -10.0f || playerPos.z > 10.0f)
             playerPos = oldPos;
 
-        // 2. KRETANJE KAMERE (Strelice) - Nezavisno od lika!
+        // 2. KRETANJE KAMERE (Strelice)
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
             cameraPos.z -= camSpeed;
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
@@ -421,7 +401,7 @@ void processInput(GLFWwindow* window)
     }
     else
     {
-        // REZIM MERENJA: Strelice pomeraju KAMERU (Isto kao gore, ali mozda brze ili drugacije)
+        // REZIM MERENJA: Strelice pomeraju KAMERU
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
             cameraPos.z -= camSpeed;
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
@@ -432,14 +412,14 @@ void processInput(GLFWwindow* window)
             cameraPos.x += camSpeed;
     }
 
+    // Ogranicenje kamere
     if (cameraPos.x > 10.0f) cameraPos.x = 10.0f;
     if (cameraPos.x < -10.0f) cameraPos.x = -10.0f;
 
     if (cameraPos.z > 15.0f) cameraPos.z = 15.0f;
     if (cameraPos.z < -10.0f) cameraPos.z = -10.0f;
-
-
 }
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
@@ -541,6 +521,27 @@ void mouse_callback(GLFWwindow* window, int button, int action, int mods)
                     }
                 }
             }
+        }
+    }
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    // Akcija GLFW_PRESS znaci da je taster pritisnut (poziva se samo jednom po kliku)
+    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    {
+        isWalkingMode = !isWalkingMode; // Obrni vrednost (True <-> False)
+
+        // Podesavanje visine i ugla kamere pri promeni rezima
+        if (isWalkingMode) {
+            cameraPos.y = 2.0f; // Nize za setnju
+            // Gleda blago dole da bi video lika i mapu
+            cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
+        }
+        else {
+            cameraPos.y = 10.0f; // Visoko za merenje
+            // Gleda skoro skroz dole (kao 2D)
+            cameraFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
         }
     }
 }
