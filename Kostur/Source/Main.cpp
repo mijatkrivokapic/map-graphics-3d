@@ -45,6 +45,9 @@ glm::vec3 lastPlayerPos = glm::vec3(0.0f, 0.0f, 0.0f);
 std::vector<glm::vec3> measurementPoints; // Niz tačaka (čioda)
 float measurementTotalLen = 0.0f;         // Ukupna dužina
 
+float iconSize = 200.0f; // Velicina ikonice u pikselima
+float iconPadding = 20.0f; // Razmak od ivice
+
 // Za iscrtavanje linija
 unsigned int lineVAO, lineVBO;
 
@@ -156,6 +159,56 @@ int main()
 
     // Inicijalizacija tvog tekst sistema
     initText(uiShader.ID, "Resources/Antonio-Regular.ttf");
+
+    unsigned int iconWalkTex = TextureFromFile("walking.png", "Resources");
+    unsigned int iconMeasureTex = TextureFromFile("ruler.png", "Resources");
+
+    // 2. NAPRAVI 2D KVADRAT (Unit Quad: 0 do 1)
+    // Ovo nam sluzi kao "kalup" za bilo koju sliku na ekranu
+    float quadVertices[] = {
+        // Pos (x,y)  // TexCoords
+        0.0f, 1.0f,   0.0f, 1.0f,
+        1.0f, 0.0f,   1.0f, 0.0f,
+        0.0f, 0.0f,   0.0f, 0.0f,
+
+        0.0f, 1.0f,   0.0f, 1.0f,
+        1.0f, 1.0f,   1.0f, 1.0f,
+        1.0f, 0.0f,   1.0f, 0.0f
+    };
+
+    unsigned int uiVAO, uiVBO;
+    glGenVertexArrays(1, &uiVAO);
+    glGenBuffers(1, &uiVBO);
+    glBindVertexArray(uiVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, uiVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+
+    float uiVertices[] = {
+        // Pos(x,y,z)        // Normal(0,0,1)      // Tex (OBRNUTO!)
+        // Prvi trougao
+        0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f,     1.0f, 0.0f, // Gore-Levo  (bilo 0,1)
+        1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f,     0.0f, 1.0f, // Dole-Desno (bilo 1,0)
+        0.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f,     1.0f, 1.0f, // Dole-Levo  (bilo 0,0)
+
+        // Drugi trougao
+        0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f,     1.0f, 0.0f, // Gore-Levo  (bilo 0,1)
+        1.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f,     0.0f, 0.0f, // Gore-Desno (bilo 1,1)
+        1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f,     0.0f, 1.0f  // Dole-Desno (bilo 1,0)
+    };
+
+    // Ponovo binduj sa novim podacima
+    glBufferData(GL_ARRAY_BUFFER, sizeof(uiVertices), uiVertices, GL_STATIC_DRAW);
+
+    // 0: Pos
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // 1: Normal (ignorisemo u 2D ali mora postojati)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // 2: Tex
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
 
     // --- GLAVNA PETLJA ---
@@ -310,6 +363,62 @@ int main()
         // ===========================================
         // 2. FAZA: 2D UI (Tekst i ikone)
         // ===========================================
+
+        glDisable(GL_DEPTH_TEST); // UI je uvek na vrhu
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // --- A) CRTANJE IKONICE ---
+        // Koristimo phongShader ali ga "silujemo" da radi kao 2D shader
+        phongShader.use();
+
+        // Matrica: Ortogonalna (pikseli ekrana)
+        glm::mat4 uiProj = glm::ortho(0.0f, (float)width, 0.0f, (float)height);
+        phongShader.setMat4("uP", uiProj);
+        phongShader.setMat4("uV", glm::mat4(1.0f)); // Nema kamere u UI
+
+        // Model matrica: Pozicioniranje gore desno
+        glm::mat4 iconModel = glm::mat4(1.0f);
+        // Pozicija: Sirina - (Velicina + Padding), Visina - (Velicina + Padding)
+        float iconX = width - (iconSize + iconPadding);
+        float iconY = height - (iconSize + iconPadding);
+
+        iconModel = glm::translate(iconModel, glm::vec3(iconX, iconY, 0.0f));
+        iconModel = glm::scale(iconModel, glm::vec3(iconSize, iconSize, 1.0f));
+        phongShader.setMat4("uM", iconModel);
+
+        // TRIK: Iskljuci svetlo da se slika vidi u originalnoj boji!
+        // Postavi Ambijentalno na 1.0 (Full Brightness), ostalo na 0
+        phongShader.setVec3("uSun.kA", 1.0f, 1.0f, 1.0f);
+        phongShader.setVec3("uSun.kD", 0.0f, 0.0f, 0.0f);
+        phongShader.setVec3("uSun.kS", 0.0f, 0.0f, 0.0f);
+        // Iskljuci tackasta svetla za UI
+        phongShader.setInt("uNrActiveLights", 0);
+
+        // Materijal na belo
+        phongShader.setVec3("uMaterial.kA", 1.0f, 1.0f, 1.0f);
+        phongShader.setVec3("uMaterial.kD", 0.0f, 0.0f, 0.0f); // Difuzno nula jer nemamo svetlo
+        phongShader.setVec3("uMaterial.kS", 0.0f, 0.0f, 0.0f);
+
+        // Odaberi teksturu zavisno od moda
+        phongShader.setInt("uUseTexture", 1);
+        glActiveTexture(GL_TEXTURE0);
+
+        if (isWalkingMode) {
+            glBindTexture(GL_TEXTURE_2D, iconWalkTex); // Slika za setanje
+        }
+        else {
+            glBindTexture(GL_TEXTURE_2D, iconMeasureTex); // Slika za merenje
+        }
+
+        glBindVertexArray(uiVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+        // --- B) CRTANJE TEKSTA (Ono tvoje postojece) ---
+        glUseProgram(uiShader.ID);
+
+
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -427,6 +536,45 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_callback(GLFWwindow* window, int button, int action, int mods)
 {
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+
+    double xpos, ypos;
+    glfwGetCursorPos(window, &xpos, &ypos);
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        // --- 1. PROVERA UI KLIKA (Gore Desno) ---
+
+        // Granice ikonice
+        // X krece od: Sirina - (Velicina + Padding)
+        // Y krece od: Padding (jer je misa 0 gore, a ne dole!)
+
+        float iconLeft = width - (iconSize + iconPadding);
+        float iconRight = width - iconPadding;
+        float iconTop = iconPadding;
+        float iconBottom = iconPadding + iconSize;
+
+        // Proveri da li je mis unutar pravougaonika
+        if (xpos >= iconLeft && xpos <= iconRight && ypos >= iconTop && ypos <= iconBottom)
+        {
+            // KLIKNUTO NA DUGME!
+            isWalkingMode = !isWalkingMode; // Promeni mod
+
+            // Azuriraj kameru odmah (kopirano iz key_callback)
+            if (isWalkingMode) {
+                cameraPos.y = 2.0f;
+                cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
+            }
+            else {
+                cameraPos.y = 10.0f;
+                cameraFront = glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f));
+            }
+
+            return; // <--- BITNO: Izadji iz funkcije, ne radi raycasting!
+        }
+    }
+
     // Reagujemo na klik samo ako NIJE walking mode
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !isWalkingMode)
     {
