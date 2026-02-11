@@ -156,10 +156,7 @@ int main()
             // Kamera prati igraca:
             // X i Z su isti kao igrac (ili malo iza), Y je visoko iznad
             // Namestamo da kamera bude 4 jedinice IZA (po Z) i 3 jedinice IZNAD (po Y)
-            cameraPos = playerPos + glm::vec3(0.0f, 3.0f, 4.0f);
-
-            // Kamera gleda direktno u igraca
-            view = glm::lookAt(cameraPos, playerPos + glm::vec3(0.0f, 1.0f, 0.0f), cameraUp);
+            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
             float dist = glm::distance(playerPos, lastPlayerPos);
 
@@ -273,67 +270,89 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Promena rezima (Space) - tvoj stari kod
+    // Promena režima (Space)
     static bool spacePressed = false;
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !spacePressed) {
         isWalkingMode = !isWalkingMode;
         spacePressed = true;
-        // Resetuje visinu kamere ako treba, mada cemo to raditi u petlji
+
+        // Podesavanje visine i ugla kamere pri promeni rezima
+        if (isWalkingMode) {
+            cameraPos.y = 2.0f; // Nize za setnju
+            // Gleda blago dole da bi video lika i mapu
+            cameraFront = glm::vec3(0.0f, -0.5f, -1.0f);
+        }
+        else {
+            cameraPos.y = 10.0f; // Visoko za merenje
+            // Gleda skoro skroz dole (kao 2D)
+            cameraFront = glm::vec3(0.0f, -0.99f, -0.1f);
+        }
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
         spacePressed = false;
     }
 
-    // --- LOGIKA KRETANJA ---
+    // Brzine
     float velocity = playerSpeed * deltaTime;
+    float camSpeed = 5.0f * deltaTime; // Brzina kamere
 
     if (isWalkingMode)
     {
-        // REZIM HODANJA: WASD pomera IGRACA
-        // Pamtimo stare koordinate da ne izadjemo van mape
+        // 1. KRETANJE LIKA (WASD) - Samo menja playerPos
         glm::vec3 oldPos = playerPos;
 
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
             playerPos.z -= velocity;
-            playerRotation = 180.0f; // Ledjima nama
+            playerRotation = 180.0f;
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
             playerPos.z += velocity;
-            playerRotation = 0.0f;   // Licem ka nama
+            playerRotation = 0.0f;
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
             playerPos.x -= velocity;
-            playerRotation = -90.0f; // Levo
+            playerRotation = -90.0f;
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
             playerPos.x += velocity;
-            playerRotation = 90.0f;  // Desno
+            playerRotation = 90.0f;
         }
 
-        // Dijagonalne rotacije (opciono poliranje)
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) playerRotation = -135.0f;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) playerRotation = 135.0f;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) playerRotation = -45.0f;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) playerRotation = 45.0f;
-
-        // Ogranicenje kretanja (da ne izadje sa mape -10 do 10)
+        // Ogranicenje lika na mapi
         if (playerPos.x < -10.0f || playerPos.x > 10.0f || playerPos.z < -10.0f || playerPos.z > 10.0f)
             playerPos = oldPos;
+
+        // 2. KRETANJE KAMERE (Strelice) - Nezavisno od lika!
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+            cameraPos.z -= camSpeed;
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+            cameraPos.z += camSpeed;
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+            cameraPos.x -= camSpeed;
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+            cameraPos.x += camSpeed;
     }
     else
     {
-        // REZIM MERENJA: Strelice pomeraju KAMERU direktno
+        // REZIM MERENJA: Strelice pomeraju KAMERU (Isto kao gore, ali mozda brze ili drugacije)
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-            cameraPos.z -= velocity;
+            cameraPos.z -= camSpeed;
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-            cameraPos.z += velocity;
+            cameraPos.z += camSpeed;
         if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-            cameraPos.x -= velocity;
+            cameraPos.x -= camSpeed;
         if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-            cameraPos.x += velocity;
+            cameraPos.x += camSpeed;
     }
-}
 
+    if (cameraPos.x > 10.0f) cameraPos.x = 10.0f;
+    if (cameraPos.x < -10.0f) cameraPos.x = -10.0f;
+
+    if (cameraPos.z > 15.0f) cameraPos.z = 15.0f;
+    if (cameraPos.z < -10.0f) cameraPos.z = -10.0f;
+
+
+}
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
