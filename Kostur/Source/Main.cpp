@@ -55,6 +55,9 @@ unsigned int mapVAO, mapVBO, mapTexture;
 unsigned int uiVAO, uiVBO, iconWalkTex, iconMeasureTex;
 unsigned int lineVAO, lineVBO;
 
+bool depthTestEnabled = true;
+bool faceCullingEnabled = false;
+
 // --- FUNCTION PROTOTYPES ---
 GLFWwindow* InitGLFW();
 void InitScene();
@@ -91,6 +94,10 @@ int main()
     // 4. Initialize Text System
     initText(uiShader.ID, "Resources/Antonio-Regular.ttf");
 
+    glEnable(GL_DEPTH_TEST);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
     // --- MAIN LOOP ---
     while (!glfwWindowShouldClose(window))
     {
@@ -107,7 +114,6 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // --- RENDER 3D SCENE ---
-        glEnable(GL_DEPTH_TEST);
         RenderScene(phongShader, humanoidModel, pinModel);
 
         // --- RENDER 2D UI ---
@@ -163,14 +169,14 @@ GLFWwindow* InitGLFW() {
 void InitScene() {
     // A) Map Setup (Plane on XZ axis)
     float mapVertices[] = {
-        // Pos                // Normals          // TexCoords
-        -10.0f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f,   0.0f, 1.0f,
-         10.0f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f,   1.0f, 1.0f,
-         10.0f, 0.0f,  10.0f, 0.0f, 1.0f, 0.0f,   1.0f, 0.0f,
+        // Pos                   // Normals          // TexCoords
+        -10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 
+        -10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f,
+         10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
 
-        -10.0f, 0.0f, -10.0f, 0.0f, 1.0f, 0.0f,   0.0f, 1.0f,
-         10.0f, 0.0f,  10.0f, 0.0f, 1.0f, 0.0f,   1.0f, 0.0f,
-        -10.0f, 0.0f,  10.0f, 0.0f, 1.0f, 0.0f,   0.0f, 0.0f
+        -10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 
+         10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+         10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f 
     };
 
     glGenVertexArrays(1, &mapVAO);
@@ -191,14 +197,14 @@ void InitScene() {
 
     // B) UI Quad Setup
     float uiVertices[] = {
-        // Pos(x,y,z)        // Normal         // Tex
-        0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-        0.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+        // Pos(x,y,z)               // Normal               // Tex
+        0.0f, 0.0f, 0.0f,          0.0f, 0.0f, 1.0f,       0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f,          0.0f, 0.0f, 1.0f,       1.0f, 1.0f, 
+        0.0f, 1.0f, 0.0f,          0.0f, 0.0f, 1.0f,       0.0f, 0.0f, 
 
-        0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,    0.0f, 0.0f, 1.0f, 0.0f, 1.0f
+        1.0f, 0.0f, 0.0f,          0.0f, 0.0f, 1.0f,       1.0f, 1.0f,
+        1.0f, 1.0f, 0.0f,          0.0f, 0.0f, 1.0f,       1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,          0.0f, 0.0f, 1.0f,       0.0f, 0.0f
     };
 
     glGenVertexArrays(1, &uiVAO);
@@ -325,7 +331,6 @@ void RenderScene(Shader& shader, Model& humanoid, Model& pin) {
 }
 
 void RenderUI(Shader& shader, Shader& textShader) {
-    glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -370,8 +375,6 @@ void RenderUI(Shader& shader, Shader& textShader) {
         RenderText(textShader.ID, "Mode: MEASURING", 25.0f, 25.0f, 1.0f, 1.0f, 1.0f, 1.0f);
     }
     RenderText(textShader.ID, ss.str(), 25.0f, SCR_HEIGHT - 50.0f, 1.0f, 1.0f, 1.0f, 0.0f); // Yellow text
-
-    glEnable(GL_DEPTH_TEST);
 }
 
 // ----------------------------------------------------------------------------
@@ -511,6 +514,21 @@ void mouse_callback(GLFWwindow* window, int button, int action, int mods) {
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_R && action == GLFW_PRESS) {
         ToggleMode();
+    }
+
+    if (key == GLFW_KEY_N && action == GLFW_PRESS) {
+        depthTestEnabled = !depthTestEnabled;
+        if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+        else glDisable(GL_DEPTH_TEST);
+        std::cout << "Depth Test: " << (depthTestEnabled ? "ON" : "OFF") << std::endl;
+    }
+
+    // Taster M za Face Culling
+    if (key == GLFW_KEY_M && action == GLFW_PRESS) {
+        faceCullingEnabled = !faceCullingEnabled;
+        if (faceCullingEnabled) glEnable(GL_CULL_FACE);
+        else glDisable(GL_CULL_FACE);
+        std::cout << "Face Culling: " << (faceCullingEnabled ? "ON" : "OFF") << std::endl;
     }
 }
 
