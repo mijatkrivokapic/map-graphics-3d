@@ -177,14 +177,14 @@ GLFWwindow* InitGLFW() {
 void InitScene() {
     // A) Map Setup (Plane on XZ axis)
     float mapVertices[] = {
-        // Pos                   // Normals          // TexCoords
-        -10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 
-        -10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f,
-         10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+        // Pos                          // Normals          // TexCoords
+        -10.0f, 0.0f, -10.0f,          0.0f, 1.0f, 0.0f,       0.0f, 0.0f, 
+        -10.0f, 0.0f,  10.0f,          0.0f, 1.0f, 0.0f,       0.0f, 1.0f, 
+         10.0f, 0.0f,  10.0f,          0.0f, 1.0f, 0.0f,       1.0f, 1.0f, 
 
-        -10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 
-         10.0f, 0.0f,  10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-         10.0f, 0.0f, -10.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f 
+         -10.0f, 0.0f, -10.0f,          0.0f, 1.0f, 0.0f,       0.0f, 0.0f, 
+          10.0f, 0.0f,  10.0f,          0.0f, 1.0f, 0.0f,       1.0f, 1.0f, 
+          10.0f, 0.0f, -10.0f,          0.0f, 1.0f, 0.0f,       1.0f, 0.0f
     };
 
     glGenVertexArrays(1, &mapVAO);
