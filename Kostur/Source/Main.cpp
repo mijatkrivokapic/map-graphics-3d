@@ -58,6 +58,9 @@ unsigned int lineVAO, lineVBO;
 bool depthTestEnabled = true;
 bool faceCullingEnabled = false;
 
+const double targetFPS = 75.0;
+const double frameTimeLimit = 1.0 / targetFPS;
+
 // --- FUNCTION PROTOTYPES ---
 GLFWwindow* InitGLFW();
 void InitScene();
@@ -104,6 +107,11 @@ int main()
         // Timing
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
+
+        if (deltaTime < frameTimeLimit) {
+            continue;
+        }
+
         lastFrame = currentFrame;
 
         // Input
@@ -367,14 +375,13 @@ void RenderUI(Shader& shader, Shader& textShader) {
 
     std::stringstream ss;
     if (isWalkingMode) {
-        ss << "Total Distance Walked: " << std::fixed << totalWalkDistance << "m";
-        RenderText(textShader.ID, "Mode: WALKING", 25.0f, 25.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+        ss << "Ukupna predjena distanca: " << std::fixed << totalWalkDistance;
     }
     else {
-        ss << "Measured Length: " << std::fixed << totalMeasuredLength << "m";
-        RenderText(textShader.ID, "Mode: MEASURING", 25.0f, 25.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+        ss << "Ukupna izmerena distanca: " << std::fixed << totalMeasuredLength;
     }
-    RenderText(textShader.ID, ss.str(), 25.0f, SCR_HEIGHT - 50.0f, 1.0f, 1.0f, 1.0f, 0.0f); // Yellow text
+    RenderText(textShader.ID, ss.str(), 25.0f, SCR_HEIGHT - 50.0f, 1.0f, 1.0f, 1.0f, 0.0f);
+    RenderText(textShader.ID, "Mijat Krivokapic SV41/2022", 25.0f, 25.0f, 1.0f, 1.0f, 1.0f, 0.0f);
 }
 
 // ----------------------------------------------------------------------------
