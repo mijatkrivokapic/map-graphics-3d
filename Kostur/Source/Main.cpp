@@ -12,6 +12,7 @@
 #include "../Header/shader.hpp"
 #include "../Header/model.hpp"
 #include "../Header/TextUtil.h"
+#include "../Header/Util.h"
 
 // --- CONSTANTS & SETTINGS ---
 const unsigned int SCR_WIDTH = 1920;
@@ -166,6 +167,9 @@ GLFWwindow* InitGLFW() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetMouseButtonCallback(window, mouse_callback);
     glfwSetKeyCallback(window, key_callback);
+
+    GLFWcursor* cursor = loadImageToCursor("Resources/compass.png");
+    glfwSetCursor(window, cursor);
 
     if (glewInit() != GLEW_OK) {
         std::cout << "Failed to initialize GLEW" << std::endl;
