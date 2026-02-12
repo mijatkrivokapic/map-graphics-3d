@@ -304,10 +304,10 @@ void RenderScene(Shader& shader, Model& humanoid, Model& pin) {
     }
     // 5. Draw Measurement Tools (Measuring Mode)
     else {
-        shader.setInt("uUseTexture", 0); // Disable texture for pure color
+        shader.setInt("uUseTexture", 0); 
 
         // Draw Pins
-        shader.setVec3("uMaterial.kA", 1.0f, 0.0f, 0.0f); // Glowing Red
+        shader.setVec3("uMaterial.kA", 1.0f, 0.0f, 0.0f);
         shader.setVec3("uMaterial.kD", 1.0f, 0.0f, 0.0f);
 
         for (auto& point : measurementPoints) {
